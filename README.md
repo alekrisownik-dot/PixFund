@@ -20,5 +20,3 @@ streamlit run app.py
 ```
 Testy: `pytest -q`
 
-## Prywatność
-Pliki z eksportami XTB, `data/`, `cache/` i `cache.db` są w `.gitignore` i nie trafiają do repozytorium.
