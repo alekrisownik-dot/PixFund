@@ -1,0 +1,17 @@
+.venv/
+cache/
+cache.db
+data/
+__pycache__/
+.pytest_cache/
+
+# dane osobiste (eksporty XTB)
+sample/
+*.xlsx
+*.xls
+*.csv
+*.db
+.env
+.streamlit/secrets.toml
+Gemini_Generated_Image_*
+CLAUDE.md
