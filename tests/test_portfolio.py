@@ -108,3 +108,11 @@ def test_profit_breakdown_sums_to_overall():
     assert b["koszt_otwartych"] == pytest.approx(225) and b["niezrealizowany_proc"] == pytest.approx(100)
     # zgodność z zyskiem gotówkowym: wartość (450) + gotówka (-100-200-50+150+60=-140) - wpłaty (0 => ujemna gotówka) 
     assert b["niezrealizowany"] + b["zrealizowany"] == pytest.approx(450 + (-140))
+
+
+def test_daily_changes_pln_and_fx():
+    idx = pd.date_range("2026-01-01", periods=3)
+    close = {"A.PL": pd.Series([100.0, 100.0, 102.0], idx), "B.US": pd.Series([10.0, 10.0, 11.0], idx)}
+    fx = {"USD": pd.Series([4.0, 4.0, 4.0], idx)}
+    out = pf.daily_changes(close, fx, {"A.PL": "PLN", "B.US": "USD", "C.PL": "PLN"})
+    assert out["A.PL"] == pytest.approx(0.02) and out["B.US"] == pytest.approx(0.10) and "C.PL" not in out

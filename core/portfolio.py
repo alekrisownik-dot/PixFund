@@ -94,6 +94,24 @@ def profit_breakdown(transactions: pd.DataFrame, price_pln: dict | pd.Series) ->
             "niezrealizowany_proc": unreal / cost * 100 if cost > 0 else float("nan")}
 
 
+def daily_changes(close: dict, fx: dict, currencies: dict) -> dict:
+    """Zmiana dzienna (ułamek) ceny w PLN: ostatnie zamknięcie vs poprzednie. ticker -> zmiana; brak danych -> pomijamy."""
+    out = {}
+    for ticker, cur in currencies.items():
+        s = close.get(ticker)
+        if s is None:
+            continue
+        s = s.dropna()
+        if cur not in ("PLN", ""):
+            if cur not in fx:
+                continue
+            s = s * fx[cur].reindex(s.index.union(fx[cur].index)).ffill().reindex(s.index)
+            s = s.dropna()
+        if len(s) >= 2 and s.iloc[-2] > 0:
+            out[ticker] = float(s.iloc[-1] / s.iloc[-2] - 1)
+    return out
+
+
 def snapshot_prices(open_positions: pd.DataFrame) -> dict:
     """Cena jednostki w PLN z migawki raportu XTB (wartość / ilość) – awaryjnie, gdy brak notowań."""
     g = open_positions.groupby("ticker").agg(w=("wartość", "sum"), q=("ilość", "sum"))

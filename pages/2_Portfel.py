@@ -14,9 +14,10 @@ tr, co, op = data["transactions"], data["cash_ops"], data["open_positions"]
 end = pd.Timestamp.today().normalize()
 daily, close, fxs = ui.history(tr, co, end)
 
-mode = st.radio("Wycena pozycji", ["Raport XTB", "Rynkowa (Yahoo + NBP)"], horizontal=True,
-                help="Raport XTB: ceny i kursy walut z eksportu (zgodne z tym, co widzisz w XTB). "
-                     "Rynkowa: zamknięcia giełdowe i kursy średnie NBP.")
+mode = st.radio("Wycena pozycji", ["Raport XTB", "Rynkowa (Yahoo + NBP)"], horizontal=True, index=1,
+                help="Raport XTB: ceny i kursy walut z chwili eksportu – zrzut z dnia raportu, nie odświeża się "
+                     "(po kilku dniach zysk pozycji odbiega od xStation). "
+                     "Rynkowa: najnowsze notowania (Yahoo) i kursy średnie NBP – zgodne z bieżącym stanem w xStation.")
 xtb_mode = mode == "Raport XTB"
 daily_mkt = daily  # TWR i benchmark zawsze z jednolitej wyceny rynkowej (bez skoku na ostatnim dniu)
 if xtb_mode:  # ostatni dzień wyceniamy wg migawki raportu, reszta historii po cenach rynkowych
@@ -105,15 +106,23 @@ pf_fig.update_yaxes(tickformat="+,.0f", ticksuffix=" zł")
 ui.show(pf_fig)
 
 st.subheader("Pozycje")
-view = pos[["ticker", "nazwa", "rynek", "ilość", "śr_cena_zakupu", "koszt_pln", "wartość_pln",
+chg = pf.daily_changes(close, fxs, tr.groupby("ticker")["waluta"].last().to_dict())
+pos["dzień_proc"] = pos["ticker"].map(chg) * 100
+prev_val = pos["wartość_pln"] / (1 + pos["dzień_proc"] / 100)
+day_pln = (pos["wartość_pln"] - prev_val).sum()  # pozycje bez notowań (NaN) nie wchodzą do sumy
+day_base = prev_val[pos["dzień_proc"].notna()].sum()
+if day_base > 0:
+    st.metric("Zmiana dzienna pozycji", f"{day_pln:+,.2f} zł", pct(day_pln / day_base),
+              help="Ostatnie zamknięcie vs poprzednie (w PLN), ważone wartością pozycji.")
+view = pos[["ticker", "nazwa", "rynek", "ilość", "śr_cena_zakupu", "koszt_pln", "wartość_pln", "dzień_proc",
             "zysk_pln", "zysk_proc", "udział"]].rename(columns={
-    "śr_cena_zakupu": "śr. cena", "koszt_pln": "koszt zł", "wartość_pln": "wartość zł",
+    "śr_cena_zakupu": "śr. cena", "koszt_pln": "koszt zł", "wartość_pln": "wartość zł", "dzień_proc": "dziś %",
     "zysk_pln": "zysk zł", "zysk_proc": "zysk %", "udział": "udział %"})
 sign_color = lambda v: ("" if pd.isna(v) or v == 0 else f"color: {ui.UP if v > 0 else ui.DOWN}; font-weight: 600")
 styler = (view.style
           .format({"ilość": "{:.4f}", "śr. cena": "{:,.2f}", "koszt zł": "{:,.2f}", "wartość zł": "{:,.2f}",
-                   "zysk zł": "{:+,.2f}", "zysk %": "{:+.2f}%", "udział %": "{:.1f}%"}, na_rep="–")
-          .map(sign_color, subset=["zysk zł", "zysk %"]))
+                   "dziś %": "{:+.2f}%", "zysk zł": "{:+,.2f}", "zysk %": "{:+.2f}%", "udział %": "{:.1f}%"}, na_rep="–")
+          .map(sign_color, subset=["dziś %", "zysk zł", "zysk %"]))
 st.dataframe(styler, hide_index=True, height=min(80 + 35 * len(view), 520))
 
 # --- struktura
